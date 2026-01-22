@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from urllib.parse import urljoin
-
 from bs4 import BeautifulSoup
 from requests.sessions import Session
 
@@ -21,21 +19,27 @@ class UserPage:
         return user_link is not None
 
     def login(self, email: str, password: str) -> None:
-        selector = "#form_chousei_token"
-        form_chousei_token = self.soup.select_one(selector)
-        if form_chousei_token is None:
-            raise TagNotFoundError(selector)
-        chousei_token = form_chousei_token.get("value")
+        token_input = self.soup.select_one("input[name='_token']")
+        if token_input is None:
+            raise TagNotFoundError("input[name='_token']")
+
+        csrf_token = token_input.get("value")
+
         data = {
-            "chousei_token": chousei_token,
+            "_token": csrf_token,
             "email": email,
             "password": password,
             "remember": "1",
         }
-        url = "https://chouseisan.com/auth/login"
-        r = self.session.post(url, data=data)
+
+        r = self.session.post(
+            "https://chouseisan.com/auth/login",
+            data=data,
+            headers={"Referer": "https://chouseisan.com/login"},
+        )
         r.raise_for_status()
         self.soup = BeautifulSoup(r.content, "html.parser")
+
         if not self.is_authenticated:
             raise LoginError
 
@@ -50,30 +54,27 @@ class TopPage:
         r.raise_for_status()
         self.soup = BeautifulSoup(r.content, "html.parser")
 
-    def _extract_action_url(self):
-        selector = "#newEventForm"
-        new_event_form = self.soup.select_one(selector)
-        if new_event_form is None:
-            raise TagNotFoundError(selector)
-        return new_event_form.get("action")
-
     def create_event(self, name: str, comment: str, kouho: str) -> NewEventPage:
-        selector = "#chousei_token"
-        chousei_token = self.soup.select_one(selector)
-        if chousei_token is None:
-            raise TagNotFoundError(selector)
-        chousei_token_value = chousei_token.get("value")
+        token = self.soup.select_one('input[name="_token"]')
+        if token is None:
+            raise TagNotFoundError('input[name="_token"]')
+
         data = {
-            "chousei_token": chousei_token_value,
+            "_token": token["value"],
             "name": name,
             "comment": comment,
             "kouho": kouho,
         }
-        action_url = self._extract_action_url()
-        base_url = "https://chouseisan.com/schedule"
-        url = urljoin(base_url, action_url)
-        r = self.session.post(url, data)
+
+        url = "https://chouseisan.com/schedule/newEvent/create"
+
+        r = self.session.post(
+            url,
+            data=data,
+            headers={"Referer": "https://chouseisan.com/"},
+        )
         r.raise_for_status()
+
         soup = BeautifulSoup(r.content, "html.parser")
         return NewEventPage(self.session, soup)
 

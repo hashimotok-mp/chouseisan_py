@@ -1,4 +1,6 @@
-"""Automates the operations of `調整さん <https://chouseisan.com/>`_ (Chouseisan)."""
+"""
+Automates the operations of `調整さん <https://chouseisan.com/>`_ (Chouseisan).
+"""
 
 from __future__ import annotations
 
@@ -7,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 import requests
+import traceback
 
 from ._pages import UserPage
 
@@ -67,15 +70,19 @@ class Chouseisan:
             (Chouseisan)
         :raises requests.HTTPError: An HTTP error occurred
         """
-        user_page = UserPage(self.session)
-        if self.auth and not user_page.is_authenticated:
-            user_page.login(self.auth.email, self.auth.password)
-        top_page = user_page.go_to_top_page()
-        kouho_list = (
-            self._strftime(candidate) if isinstance(candidate, datetime) else candidate
-            for candidate in candidate_days
-        )
-        event = top_page.create_event(
-            name=title, comment=comment, kouho="\n".join(kouho_list)
-        )
-        return event.get_event_url()
+        try:
+            user_page = UserPage(self.session)
+            if self.auth and not user_page.is_authenticated:
+                user_page.login(self.auth.email, self.auth.password)
+            top_page = user_page.go_to_top_page()
+            kouho_list = (
+                self._strftime(candidate) if isinstance(candidate, datetime) else candidate
+                for candidate in candidate_days
+            )
+            event = top_page.create_event(
+                name=title, comment=comment, kouho="\n".join(kouho_list)
+            )
+            return event.get_event_url()
+        except Exception:
+            traceback.print_exc()
+            return None
